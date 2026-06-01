@@ -24,6 +24,9 @@ const mcpLimiter = rateLimit({
   message: { jsonrpc: "2.0", error: { code: -32000, message: "Rate limit exceeded; slow down." }, id: null },
 });
 
+// Friendly landing: the root has no UI, so a browser otherwise gets a bare 404 — send humans to the repo.
+app.get("/", (_req, res) => res.redirect(302, "https://github.com/chrisns/uk-tenders-mcp"));
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "uk-tenders-mcp", version: "0.1.0" });
 });
