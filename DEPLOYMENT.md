@@ -159,8 +159,9 @@ The proven pattern — see `scripts/cf_finalize.py` (the Contracts Finder templa
 4. re-run cross-source dedup: `python -m uk_tenders_ingest.match`.
 
 The same pattern applies to any source by swapping the `source=` filter and the adapter; CF has a
-parallel variant (`scripts/cf_parallel_finalize.py`) for its larger corpus. A full-corpus rebuild
-reprojects each source in turn. (A normal `--mode backfill` would also rebuild the public tables, but
+parallel variant (`scripts/cf_parallel_finalize.py`) for its larger corpus. `scripts/reproject_redacted.py`
+is a ready multi-source implementation (FTS + CF + PCS in one pass) — it's what applied the [ADR-0006](docs/adr/0006-serve-source-data-verbatim.md)
+verbatim switch to the deployed data. (A normal `--mode backfill` would also rebuild the public tables, but
 it re-fetches upstream — unnecessary here, since the raw event log already holds every release verbatim.)
 
 ## Infrastructure as code (Terraform)
