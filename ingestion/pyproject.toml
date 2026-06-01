@@ -1,0 +1,37 @@
+[project]
+name = "uk-tenders-ingest"
+version = "0.1.0"
+description = "UK Tenders MCP — Python ingestion (source adapters, OCDS compile, BigQuery load)"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31,<3",
+    "google-cloud-bigquery>=3.25,<4",
+    "ocdsmerge>=0.6,<1",
+    "google-genai>=1.0,<2",  # Gemini (Vertex AI) — eTendersNI CAPTCHA solving
+    "curl_cffi>=0.7,<1",     # Chrome TLS/JA3 impersonation (security-sensitive native dep)
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "responses>=0.25",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+uk-tenders-ingest = "uk_tenders_ingest.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

@@ -1,0 +1,17 @@
+.git
+.venv
+node_modules
+dist
+**/__pycache__
+.pytest_cache
+**/.pytest_cache
+terraform/.terraform
+*.tfstate
+*.tfstate.*
+.DS_Store
+.env
+*.env
+.env.*
+*.local
+.claude
+.playwright-mcp

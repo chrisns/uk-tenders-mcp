@@ -1,0 +1,30 @@
+{
+  "name": "uk-tenders-mcp-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "UK Tenders MCP — remote MCP API (TypeScript) over BigQuery",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google-cloud/bigquery": "^7.9.0",
+    "@modelcontextprotocol/sdk": "^1.22.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.4.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.6"
+  }
+}

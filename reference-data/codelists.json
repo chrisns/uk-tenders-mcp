@@ -1,0 +1,46 @@
+{
+  "note": "OCDS 1.1 codelists relevant to UK Tenders MCP. Keep tender/award/contract statuses SEPARATE (PRD §13). Regimes and procurement category are project-derived.",
+  "tender_status": [
+    { "code": "planning", "title": "Planning" },
+    { "code": "planned", "title": "Planned" },
+    { "code": "active", "title": "Active (open / live)" },
+    { "code": "cancelled", "title": "Cancelled" },
+    { "code": "unsuccessful", "title": "Unsuccessful" },
+    { "code": "complete", "title": "Complete" },
+    { "code": "withdrawn", "title": "Withdrawn" }
+  ],
+  "award_status": [
+    { "code": "pending", "title": "Pending" },
+    { "code": "active", "title": "Active (awarded)" },
+    { "code": "cancelled", "title": "Cancelled" },
+    { "code": "unsuccessful", "title": "Unsuccessful" }
+  ],
+  "contract_status": [
+    { "code": "pending", "title": "Pending" },
+    { "code": "active", "title": "Active" },
+    { "code": "cancelled", "title": "Cancelled" },
+    { "code": "terminated", "title": "Terminated" }
+  ],
+  "main_procurement_category": [
+    { "code": "goods", "title": "Goods", "note": "OCDS 'goods' == CPV/EU 'supplies'" },
+    { "code": "works", "title": "Works" },
+    { "code": "services", "title": "Services" }
+  ],
+  "ocds_method": [
+    { "code": "open", "title": "Open" },
+    { "code": "selective", "title": "Selective" },
+    { "code": "limited", "title": "Limited / direct" },
+    { "code": "direct", "title": "Direct award" }
+  ],
+  "party_roles": [
+    "buyer", "procuringEntity", "supplier", "tenderer", "funder",
+    "payer", "payee", "reviewBody", "interestedParty"
+  ],
+  "regimes": [
+    { "code": "pca2023", "title": "Procurement Act 2023", "from": "2025-02-24", "notice_types": "UK1-UK17" },
+    { "code": "legacy", "title": "Pre-Act (PCR2015 etc.)", "notice_types": "F/T forms" },
+    { "code": "scotland", "title": "Procurement Reform (Scotland) Act 2014" },
+    { "code": "mixed", "title": "Process spanning regimes" }
+  ],
+  "currencies_common": ["GBP", "EUR", "USD"]
+}

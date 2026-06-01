@@ -1,0 +1,30 @@
+{
+  "note": "Maps source notice/form codes → name → regime → OCDS stage (PRD §13). Drives regime derivation when the code is known. Legacy F/T families summarised.",
+  "pca2023": [
+    { "code": "UK1", "name": "Pipeline notice", "stage": "planning" },
+    { "code": "UK2", "name": "Preliminary market engagement notice", "stage": "planning" },
+    { "code": "UK3", "name": "Planned procurement notice", "stage": "planning" },
+    { "code": "UK4", "name": "Tender notice", "stage": "tender" },
+    { "code": "UK5", "name": "Transparency notice (direct award)", "stage": "tender" },
+    { "code": "UK6", "name": "Contract award notice", "stage": "award" },
+    { "code": "UK7", "name": "Contract details notice", "stage": "award" },
+    { "code": "UK9", "name": "Contract performance notice", "stage": "award" },
+    { "code": "UK10", "name": "Contract change notice", "stage": "award" },
+    { "code": "UK11", "name": "Contract termination notice", "stage": "award" },
+    { "code": "UK12", "name": "Procurement termination notice", "stage": "tender" },
+    { "code": "UK13", "name": "Dynamic market intention notice", "stage": "planning" },
+    { "code": "UK14", "name": "Dynamic market establishment notice", "stage": "planning" },
+    { "code": "UK15", "name": "Dynamic market modification notice", "stage": "planning" },
+    { "code": "UK16", "name": "Dynamic market cessation notice", "stage": "planning" },
+    { "code": "UK17", "name": "Payments compliance notice", "stage": "award" }
+  ],
+  "legacy_families": [
+    { "prefix": "F01-F03", "regulation": "PCR 2015", "summary": "Prior information / contract / award notices" },
+    { "prefix": "F04-F06", "regulation": "UCR 2016 (utilities)", "summary": "Periodic / qualification / award" },
+    { "prefix": "F12-F15", "regulation": "PCR 2015", "summary": "Design contest / voluntary ex-ante" },
+    { "prefix": "F16-F19", "regulation": "DSPCR 2011 (defence)", "summary": "Defence notices" },
+    { "prefix": "F21-F23", "regulation": "PCR 2015", "summary": "Social and other specific services" },
+    { "prefix": "F24-F25", "regulation": "CCR 2016 (concessions)", "summary": "Concession notices" },
+    { "prefix": "T01-T02", "regulation": "Reg 1370/2007", "summary": "Rail/transport public service notices" }
+  ]
+}
