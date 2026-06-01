@@ -14,7 +14,7 @@ UK public-procurement data is open and standardised (OCDS, Open Government Licen
 
 **UK Tenders MCP** is a remote [Model Context Protocol](https://modelcontextprotocol.io) server that mirrors the UK procurement corpus (earliest source from 2016; FTS from 2021) into one analytics-ready index and exposes it to AI assistants. It is **analytics-first**: optimised for historical and cross-cutting questions over the whole corpus, not live opportunity discovery. It mirrors the [`govreposcrape`](../../govreposcrape) architecture — a TypeScript Cloud Run MCP API over a managed Google Cloud index, fed by a **Python** scheduled ingestion job ([ADR-0005](adr/0005-python-ingestion-typescript-api.md)) — but where govreposcrape does *semantic search over unstructured text*, this does *structured analytics over OCDS records*.
 
-Every result links to the **official notice URL**; every response signals **how fresh** the data is, per source. The index is a faithful, attributed, **redacted** mirror — never the authority of record.
+Every result links to the **official notice URL**; every response signals **how fresh** the data is, per source. The index is a faithful, attributed, **verbatim** mirror — never the authority of record.
 
 ---
 
@@ -33,7 +33,7 @@ Every result links to the **official notice URL**; every response signals **how 
 1. A **complete, deduplicated, analytics-ready** index of UK public-procurement OCDS data across all five portals.
 2. **Analytics-first** querying across awarded value, CPV, buyer, supplier, region, time, status, regime.
 3. First-class **"what changed"**: a materialised field-level change feed and per-process change timelines.
-4. **Faithful provenance & lawful handling**: official notice URL on every record; per-source freshness on every response; OGL v3.0 attribution; **personal data redacted** from the public surface (§10.1).
+4. **Faithful provenance & attribution**: official notice URL on every record; per-source freshness on every response; OGL v3.0 attribution; source data reproduced **verbatim** as published, with a published takedown route (§10.1).
 5. **Frictionless public access** over MCP (no auth).
 6. **Low, capped running cost** (scale-to-zero serving; per-query and per-day spend caps sized from §15).
 
@@ -134,15 +134,15 @@ Source portals ─(Python adapters)─► GCS raw archive (immutable, PII-bearin
    │      │ compile (ocds-merge, per OCID, deterministic)                         │
    │      ▼                                                                       │
    │  compiled_process · star schema · process_group · process_change · ingest_run│
-   └──────────────────────────────── redact + build-and-swap ────────────────────┘
+   └─────────────────────────────── compile + build-and-swap ────────────────────┘
                                           │
                                           ▼
-   ┌─────────────── uk_tenders_public (BigQuery, READ dataset, redacted) ─────────┐
-   │  query-serving tables/views (no personal data) ◄── public read-only SA       │
+   ┌─────────────── uk_tenders_public (BigQuery, READ dataset, verbatim) ─────────┐
+   │  query-serving tables/views (verbatim copy) ◄───── public read-only SA       │
    └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Two datasets** ([ADR-0001](adr/0001-bigquery-index-with-gcs-raw-and-star-schema.md)): `uk_tenders_raw` (write, PII) vs `uk_tenders_public` (read, redacted). The public read-only service account ([ADR-0003](adr/0003-public-mcp-readonly-sql-secured-by-iam.md)) sees only the public dataset/views.
+- **Two datasets** ([ADR-0001](adr/0001-bigquery-index-with-gcs-raw-and-star-schema.md)): `uk_tenders_raw` (write, full event log) vs `uk_tenders_public` (read-only, verbatim query-serving copy) — a least-privilege read boundary ([ADR-0006](adr/0006-serve-source-data-verbatim.md)), not a redaction step. The public read-only service account ([ADR-0003](adr/0003-public-mcp-readonly-sql-secured-by-iam.md)) sees only the public dataset/views.
 - **Raw event log**: lossless, partitioned by load date, clustered by (source, ocid, release_id).
 - **Compiled layer**: ocds-merge per OCID — sort releases by date ascending; the canonical tie-break is input-order (non-deterministic), so we impose a **deterministic secondary sort on release id** before folding (later values win; nulls delete; id-keyed arrays merge per element). Fully rebuildable.
 - **Star schema**: hot scalars flattened to columns + nested `ARRAY<STRUCT>` for repeatable groups (`UNNEST` on read); full object retained too.
@@ -169,7 +169,7 @@ Source portals ─(Python adapters)─► GCS raw archive (immutable, PII-bearin
 **Error contract (all tools):** a uniform envelope `{ code, message, hint }`. Defined cases include: `query_sql` cost-exceeds-cap (structured "would scan ~N bytes; cap is M" *before* executing), timeout, syntax error, attempted DML (refused); `get_tender` unknown/ambiguous id; `aggregate_tenders` invalid metric×dimension or cross-currency sum (rejected with a "group by currency" hint); pagination (opaque cursor, max page size, whether a total count is available — stated explicitly); upstream 429 surfaced as retryable.
 
 ### 8.3 Result shaping (token economy)
-`resultMode` on every list/get tool: `minimal` (default — id, title, buyer, **awarded/estimated value**, status, key dates, **official URL**), `standard` (+ description, CPV, lead award & parties), `full` (complete compiled record — **redacted public dataset only**). The official notice URL (e.g. `https://www.find-tender.service.gov.uk/Notice/{noticeId}`, per-source equivalents) appears in **every** mode.
+`resultMode` on every list/get tool: `minimal` (default — id, title, buyer, **awarded/estimated value**, status, key dates, **official URL**), `standard` (+ description, CPV, lead award & parties), `full` (complete compiled record — **public dataset only**). The official notice URL (e.g. `https://www.find-tender.service.gov.uk/Notice/{noticeId}`, per-source equivalents) appears in **every** mode.
 
 ### 8.4 Provenance & freshness
 Official URL + per-record `last_updated` on every record. Every response carries a **per-source** freshness envelope (`source → last_successful_sync + status`) plus an overall worst-case `data_current_as_of`; responses **flag when any in-scope source is degraded or excluded**. OGL v3.0 attribution + "verify critical details on the official notice" in tool descriptions.
@@ -193,18 +193,19 @@ A **materialised** field-level change feed. At ingest, diff successive states of
 
 ## 10. Non-functional requirements
 
-### 10.1 Data protection (UK GDPR / DPA 2018) — launch-blocking
-OCDS notices contain personal data (`parties[].contactPoint.{name,email,telephone,faxNumber,url}`, named sole traders/partnerships, free-text fields). OGL v3.0 permits reuse but does **not** extinguish our obligations as a re-publisher.
+### 10.1 Data protection (UK GDPR / DPA 2018)
+OCDS notices contain personal data (`parties[].contactPoint.{name,email,telephone,faxNumber,url}`, named sole traders/partnerships, free-text fields). All of it is **already published as open data** by the source authorities under OGL v3.0; those authorities are the data controllers and the authority of record.
 
-- **DPIA** completed before launch; enumerate every personal-data OCDS path.
-- **Redaction at the boundary:** personal fields are stripped/hashed when building `uk_tenders_public`; **raw-with-PII stays only in the access-controlled `uk_tenders_raw` + GCS tier.** `full` resultMode and `query_sql` operate **only** over the redacted public dataset.
-- **Lawful basis** stated; a **published takedown/erasure process** and contact; retention policy for the raw tier (§10.6).
+- **Faithful, verbatim mirror ([ADR-0006](adr/0006-serve-source-data-verbatim.md)):** the index reproduces each release **as published** — no fields are stripped, hashed or altered. Re-publishing the already-public record unchanged keeps the mirror accurate and attributable; the index is explicitly **not** the authority of record.
+- **Provenance & attribution:** the **official notice URL** on every record points back to the controller's authoritative copy; OGL v3.0 attribution and a "verify on the official notice" note are surfaced in every response.
+- **Takedown route:** a published contact + takedown/erasure process is the residual control for any record a data subject wants addressed; such requests are also directed to the source authority as controller.
+- **Data isolation (not redaction):** the raw event log + GCS archive remain in the access-controlled write tier; the public read-only dataset the API exposes is a least-privilege boundary limiting the blast radius of the public endpoint, independent of content.
 
 ### 10.2 Cost
 Scale-to-zero Cloud Run; BigQuery `maximum_bytes_billed` per query + a **daily project spend cap with alerting** (launch value set from §15 sizing, not inherited). Target: monthly cost ≤ a budget set from §15 at projected adoption.
 
 ### 10.3 Security
-Public read; least-privilege read-only SA for the API (public dataset only); ingestion writes via a separate identity; PII isolation (§10.1); per-IP/connection rate limiting; statement timeouts; byte caps (the real backstop).
+Public read; least-privilege read-only SA for the API (public dataset only); ingestion writes via a separate identity; least-privilege read isolation (§10.1); per-IP/connection rate limiting; statement timeouts; byte caps (the real backstop).
 
 ### 10.4 Testing
 - Per-adapter **golden-file** tests (raw fixture → expected canonical OCDS); **recorded-cassette** HTTP — **no live-source calls in CI**.
@@ -218,7 +219,7 @@ Public read; least-privilege read-only SA for the API (public dataset only); ing
 A monitoring matrix `{metric, threshold, severity, destination}`. Minimum: nightly-ingest failed/stalled per source; watermark-not-advanced; per-source release-count anomaly (drop to ~0 despite "success"); BigQuery daily bytes/spend vs cap; API 5xx/latency/uptime; rate-limit trips. Alert channel + response owner named.
 
 ### 10.6 Data lifecycle & versioning
-GCS path/partition convention + per-run load manifest so a full rebuild is reproducible and its **runtime measured as a recovery SLO**. Raw-tier retention policy (it is the PII-holding tier — §10.1). Derived-table schema evolution (likely, given PA2023's ~143 new fields) via versioned datasets / build-and-swap, no downtime. **Reference-data versioning** (§13): store the ref-data version used in each derivation; define recompute-vs-stamp policy when a codelist (CPV/ITL) changes.
+GCS path/partition convention + per-run load manifest so a full rebuild is reproducible and its **runtime measured as a recovery SLO**. Raw-tier retention policy (it holds the full lossless raw archive — §10.1). Derived-table schema evolution (likely, given PA2023's ~143 new fields) via versioned datasets / build-and-swap, no downtime. **Reference-data versioning** (§13): store the ref-data version used in each derivation; define recompute-vs-stamp policy when a codelist (CPV/ITL) changes.
 
 ### 10.7 Deployment & CI/CD
 **Terraform** provisions the two datasets + distinct IAM, the GCS bucket(s), Cloud Run service (TS API) and Cloud Run Jobs (Python adapters + orchestrator), and Cloud Scheduler — so the read/write separation is reproducible. At least a **staging dataset** to validate derivations/matcher before promotion. Schema-migration + reference-data load as deploy steps. A deploy-time check asserts the two service accounts' IAM. Politeness to sources: adaptive backoff, `Retry-After`, conservative poll rates.
@@ -289,7 +290,7 @@ A spine for engineers; each ties to Goals/NFRs and tags the §12 question it gat
 - **AC-1** A query for a known FTS notice returns its official URL in all three `resultMode`s.
 - **AC-2** With PCS marked stale in `ingest_run`, search/aggregate over the other sources still returns within SLA and the response flags PCS degraded.
 - **AC-3** `query_sql` attempting DML or a >cap scan returns a structured error and performs no write (security test).
-- **AC-4** No `contactPoint` personal field appears in any `uk_tenders_public` table/view or any tool response (PII test).
+- **AC-4** `uk_tenders_public` reproduces source releases **verbatim** — `parties[].contactPoint` and free-text fields appear exactly as published, with no redaction applied (fidelity test); the API read-only SA can read only `uk_tenders_public`, never the raw dataset (least-privilege test).
 - **AC-5** Re-scraping eTendersNI for an unchanged notice produces no new OCID and no `process_change` row (idempotency test).
 - **AC-6** `aggregate_tenders` sum across mixed currencies is rejected with a remediation hint.
 - **AC-7** OCDS-merge conformance suite passes against OCP fixtures (incl. one CF 1.0 → 1.1 up-conversion case).
@@ -299,4 +300,4 @@ A spine for engineers; each ties to Goals/NFRs and tags the §12 question it gat
 
 ## 17. Appendix — house lineage
 
-This PRD mirrors [`govreposcrape`](../../govreposcrape)'s shape: a TypeScript Cloud Run MCP read API over a managed GCP index, fed by a **Python** scheduled ingestion job, distributed as a Claude Code plugin, public and unauthenticated, cost-capped. The defining difference is the **data model**: govreposcrape indexes unstructured text for *semantic search*; UK Tenders MCP indexes structured, multi-source, deduplicated OCDS for *analytics* — which is why this document centres on the canonical model, cross-source identity, PII redaction, and the analytics tool surface rather than relevance tuning.
+This PRD mirrors [`govreposcrape`](../../govreposcrape)'s shape: a TypeScript Cloud Run MCP read API over a managed GCP index, fed by a **Python** scheduled ingestion job, distributed as a Claude Code plugin, public and unauthenticated, cost-capped. The defining difference is the **data model**: govreposcrape indexes unstructured text for *semantic search*; UK Tenders MCP indexes structured, multi-source, deduplicated OCDS for *analytics* — which is why this document centres on the canonical model, cross-source identity, faithful verbatim re-publication, and the analytics tool surface rather than relevance tuning.

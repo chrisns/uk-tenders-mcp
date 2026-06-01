@@ -2,8 +2,8 @@
 
 Idempotent loads (PRD §7.4): the event log MERGEs on content_hash (re-crawls are
 no-ops); derived tables are rebuilt per affected OCID via delete-by-ocid + insert from
-a staging table. Datasets enforce the PII boundary (ADR-0001/0003): raw (write/PII) vs
-public (read/redacted).
+a staging table. Datasets enforce a least-privilege read boundary (ADR-0001/0003): raw
+(write) vs public (read-only, query-serving).
 """
 
 from __future__ import annotations

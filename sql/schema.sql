@@ -1,13 +1,13 @@
 -- UK Tenders MCP — BigQuery schema (ADR-0001, ADR-0003)
--- Two datasets enforce the PII boundary:
---   uk_tenders_raw    : WRITE dataset, full PII-bearing OCDS, ingestion identity only
---   uk_tenders_public : READ dataset, redacted, the only thing the API read-only SA sees
+-- Two datasets enforce a least-privilege read boundary:
+--   uk_tenders_raw    : WRITE dataset, full OCDS event log, ingestion identity only
+--   uk_tenders_public : READ dataset, verbatim query-serving copy, the only thing the API read-only SA sees
 -- Run with: bq query --use_legacy_sql=false < sql/schema.sql   (project from `bq` default)
 -- Dataset creation is handled by Terraform (terraform/) or scripts/bootstrap_bq.sh;
 -- this file defines the tables/views. Location: EU (London-friendly multi-region).
 
 -- ============================================================================
--- RAW (write, PII) — uk_tenders_raw
+-- RAW (write) — uk_tenders_raw
 -- ============================================================================
 
 -- Append-only release event log: the source of truth. Full release JSON retained
@@ -53,13 +53,14 @@ PARTITION BY DATE(started_at)
 CLUSTER BY source, status;
 
 -- ============================================================================
--- PUBLIC (read, redacted) — uk_tenders_public
--- Personal data (parties[].contactPoint.{name,email,telephone,faxNumber}) is
--- stripped by the ingestion redaction step before rows land here. The API's
--- read-only service account is granted dataViewer on THIS dataset only.
+-- PUBLIC (read, query-serving) — uk_tenders_public
+-- A verbatim projection of the compiled releases (no redaction; the index is a
+-- faithful mirror of public-domain source data). The API's read-only service
+-- account is granted dataViewer on THIS dataset only — a least-privilege read
+-- boundary, so it can never reach the full raw event log or GCS archive.
 -- ============================================================================
 
--- One row per contracting process: compiled current state (redacted).
+-- One row per contracting process: compiled current state (verbatim).
 CREATE TABLE IF NOT EXISTS `uk_tenders_public.compiled_process`
 (
   ocid              STRING NOT NULL,
@@ -91,8 +92,8 @@ CREATE TABLE IF NOT EXISTS `uk_tenders_public.compiled_process`
                       date TIMESTAMP >>,
   parties           ARRAY<STRUCT<
                       id STRING, name STRING,
-                      roles ARRAY<STRING> >>,   -- contactPoint personal fields removed
-  compiled_json     STRING             -- redacted compiled release as JSON text (PARSE_JSON on read)
+                      roles ARRAY<STRING> >>,   -- id/name/roles summary; full party (incl. contactPoint) is in compiled_json
+  compiled_json     STRING             -- verbatim compiled release as JSON text (PARSE_JSON on read)
 )
 -- Non-partitioned, clustered only. The full-history backfill compiles via per-shard staging
 -- tables assembled with a single CTAS; date-partitioning here tripped BigQuery's

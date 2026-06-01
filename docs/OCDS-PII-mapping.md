@@ -1,37 +1,21 @@
-# OCDS personal-data mapping (redaction policy)
+# OCDS personal data — where it appears (handling note)
 
-Referenced by [ADR-0003](adr/0003-public-mcp-readonly-sql-secured-by-iam.md) and PRD §10.1. This is the
-canonical list of which OCDS paths carry personal data and how each is handled at the boundary
-between the **raw** dataset (`uk_tenders_raw`, access-controlled, PII-bearing) and the **public**
-dataset (`uk_tenders_public`, the only thing the API can read).
+The index re-publishes UK procurement OCDS **verbatim** ([ADR-0006](adr/0006-serve-source-data-verbatim.md)): personal data is **not** redacted — it is reproduced exactly as the source authorities publish it as open data (OGL v3.0). This note documents *where* personal data appears, for transparency and to support takedown handling (PRD §10.1). It is **not** a redaction policy; nothing listed here is stripped.
 
-Redaction is implemented in `ingestion/src/uk_tenders_ingest/canonical.py::redact()`, which walks the
-entire OCDS tree and removes the listed `contactPoint` fields wherever they appear — including nested
-copies under `parties[]`, `tender.procuringEntity`, `awards[].suppliers[]`, `buyer`, etc. Proven by
-`ingestion/tests/test_canonical.py::test_redact_strips_contacts_at_every_depth`.
+## Where personal data appears in the record
 
-## Stripped before reaching the public dataset
-
-| OCDS path (anywhere in the tree) | Reason |
+| OCDS path (anywhere in the tree) | Kind |
 |---|---|
 | `*.contactPoint.name` | Named individual |
 | `*.contactPoint.email` | Personal/role email |
-| `*.contactPoint.telephone` | Phone |
-| `*.contactPoint.faxNumber` | Fax |
+| `*.contactPoint.telephone`, `*.contactPoint.faxNumber` | Phone / fax |
+| `parties[].name`, `buyer.name`, `awards[].suppliers[].name` | Organisation names — but a sole-trader/partnership name may be personal |
+| `tender.title`, `tender.description`, other free text | May contain personal data a buyer typed in |
 
-`*.contactPoint.url` is **retained** (organisational, not personal).
-
-## Retained (organisational / transparency data, not personal under the public-task basis)
-
-| OCDS path | Note |
-|---|---|
-| `parties[].name`, `buyer.name`, `awards[].suppliers[].name` | Organisation names. **Caveat:** a sole-trader/partnership name may be personal; flagged for the DPIA. |
-| `parties[].identifier`, `*.id` | Org identifiers (Companies House, PPON) |
-| `parties[].address`, `*.region` | Organisation address / delivery region |
-| `tender.title`, `tender.description` | Free text — DPIA must confirm buyers don't paste personal data here; takedown process covers residual cases |
+All of the above is served as published. The **official notice URL** on every record links back to the source authority's authoritative copy.
 
 ## Controls
 
-- Personal `contactPoint` fields exist **only** in `uk_tenders_raw` (and the GCS raw archive), neither of which the API service account can read.
-- `compiled_json`, the `awards`/`parties` STRUCT columns, and all hot scalars in `uk_tenders_public` are built from the **redacted** compiled release.
-- Outstanding before production (PRD §10.1): completed DPIA, stated lawful basis (public task), and a published takedown/erasure route.
+- **Provenance:** official URL + OGL v3.0 attribution on every record; the index is a faithful mirror, **not** the authority of record.
+- **Takedown:** a published contact + takedown/erasure route is the residual control; requests are also directed to the source authority as data controller.
+- **Isolation (not redaction):** the public read-only dataset is a least-privilege boundary ([ADR-0001](adr/0001-bigquery-index-with-gcs-raw-and-star-schema.md), [ADR-0003](adr/0003-public-mcp-readonly-sql-secured-by-iam.md)) — it limits what the public API can reach, independent of content.

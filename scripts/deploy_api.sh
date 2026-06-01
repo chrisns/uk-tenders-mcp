@@ -24,7 +24,7 @@ gcloud projects add-iam-policy-binding "${PROJECT}" \
   --member "serviceAccount:${SA_EMAIL}" --role roles/bigquery.jobUser \
   --condition=None --quiet >/dev/null
 
-# dataset-scoped dataViewer: the SA may read ONLY uk_tenders_public (never the raw/PII dataset)
+# dataset-scoped dataViewer: the SA may read ONLY uk_tenders_public (never the raw write dataset)
 TMP=$(mktemp)
 bq show --format=prettyjson "${PROJECT}:${PUBLIC_DATASET}" > "${TMP}"
 python3 - "$TMP" "$SA_EMAIL" <<'PY'

@@ -1,5 +1,5 @@
 // Builds the MCP server and registers the UK Tenders tool surface (PRD §8.2).
-// All analytics run over the redacted public dataset; query_sql is read-only and byte-capped.
+// All analytics run over the public dataset; query_sql is read-only and byte-capped.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -323,7 +323,7 @@ export function buildServer(): McpServer {
     {
       title: "Read-only SQL",
       description:
-        `Run a read-only BigQuery Standard SQL SELECT over the public dataset for open-ended analytics. Single statement, SELECT/WITH only. Capped at ${config.maxBytesHuman} scanned per query (call get_schema for tables/columns). Personal data is redacted from this dataset.`,
+        `Run a read-only BigQuery Standard SQL SELECT over the public dataset for open-ended analytics. Single statement, SELECT/WITH only. Capped at ${config.maxBytesHuman} scanned per query (call get_schema for tables/columns).`,
       inputSchema: { sql: z.string().describe("a single read-only SELECT/WITH statement") },
     },
     guard(async (args) => {

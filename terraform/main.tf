@@ -15,7 +15,7 @@ provider "google" {
   region  = var.region
 }
 
-# --- datasets: the PII boundary (raw=write, public=read) -----------------------
+# --- datasets: least-privilege read boundary (raw=write, public=read) ----------
 resource "google_bigquery_dataset" "raw" {
   dataset_id  = var.raw_dataset
   location    = var.bq_location
@@ -25,7 +25,7 @@ resource "google_bigquery_dataset" "raw" {
 resource "google_bigquery_dataset" "public" {
   dataset_id  = var.public_dataset
   location    = var.bq_location
-  description = "UK Tenders MCP — redacted, query-serving (read-only by API)"
+  description = "UK Tenders MCP — query-serving, read-only by API"
 }
 
 # --- service accounts ----------------------------------------------------------
@@ -70,7 +70,7 @@ resource "google_project_iam_member" "api_jobuser" {
   member  = "serviceAccount:${google_service_account.api.email}"
 }
 
-# --- GCS raw archive (replay source; PII tier) ---------------------------------
+# --- GCS raw archive (replay source; access-controlled write tier) -------------
 resource "google_storage_bucket" "raw_archive" {
   name                        = "${var.project}-uk-tenders-raw"
   location                    = var.bq_location

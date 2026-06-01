@@ -12,7 +12,7 @@ We index UK procurement data in **BigQuery**, fed from an immutable **Cloud Stor
 
 ## Boundaries this ADR commits us to
 
-- **Two datasets, not one.** A **write/raw** dataset (`uk_tenders_raw`) holds the full PII-bearing releases and is writable only by the ingestion identity; a **public/read** dataset (`uk_tenders_public`) holds redacted, query-serving tables/views and is the *only* thing the API's read-only service account can see. ADR-0003's IAM safety guarantee and the PII redaction both depend on this split.
+- **Two datasets, not one.** A **write/raw** dataset (`uk_tenders_raw`) holds the full release event log + raw JSON and is writable only by the ingestion identity; a **public/read** dataset (`uk_tenders_public`) holds the verbatim, query-serving tables/views and is the *only* thing the API's read-only service account can see. ADR-0003's IAM safety guarantee depends on this split — it is a **least-privilege read boundary** (the public endpoint can never reach the full raw archive), **not** a content/redaction boundary (the data is served verbatim — see [ADR-0006](0006-serve-source-data-verbatim.md)).
 - **Atomic publication.** Derived layers are built into staging partitions/tables and **atomically swapped** (or exposed via an `as_of` snapshot id the read views point at), so readers never observe a half-recomputed state. A failed run leaves the last good snapshot serving.
 - **Deterministic compile.** Record compilation uses Python `ocds-merge` (see [ADR-0005](0005-python-ingestion-typescript-api.md)); because its canonical tie-break is input-order, we impose a deterministic secondary sort (release id) before folding so re-crawls reproduce identical compiled output.
 

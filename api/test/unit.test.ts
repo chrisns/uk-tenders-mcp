@@ -9,7 +9,7 @@ describe("validateReadOnlySql", () => {
     expect(validateReadOnlySql("WITH x AS (SELECT 1) SELECT * FROM x").ok).toBe(true);
     expect(validateReadOnlySql("select * from uk_tenders_public.compiled_process").ok).toBe(true);
   });
-  it("rejects DDL/DML, multi-statement, and the raw PII dataset", () => {
+  it("rejects DDL/DML, multi-statement, and the raw write dataset", () => {
     expect(validateReadOnlySql("DROP TABLE t").ok).toBe(false);
     expect(validateReadOnlySql("DELETE FROM t").ok).toBe(false);
     expect(validateReadOnlySql("SELECT 1; SELECT 2").ok).toBe(false);

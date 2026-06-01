@@ -14,7 +14,6 @@ import os
 from datetime import datetime
 from typing import Any
 
-from .canonical import redact
 from .regime import process_regime, regime_for_release
 
 
@@ -180,7 +179,7 @@ def as_text(value: Any) -> str | None:
 def project_process(
     ocid: str, source: str, releases: list[dict[str, Any]], adapter
 ) -> dict[str, Any]:
-    """Build a redacted `compiled_process` row from a process's releases."""
+    """Build a `compiled_process` row from a process's releases (verbatim, no redaction)."""
     ordered = sort_releases(releases)
     compiled = compile_release(ordered)
     tender = compiled.get("tender") or {}
@@ -256,7 +255,7 @@ def project_process(
         "official_url": adapter.notice_url(latest),
         "awards": awards_out,
         "parties": parties_out,
-        "compiled_json": redact(compiled),
+        "compiled_json": compiled,
     }
 
 

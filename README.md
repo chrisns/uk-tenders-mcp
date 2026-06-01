@@ -37,7 +37,7 @@ Point it at `https://tenders.run.cns.me/mcp` (Streamable HTTP). No authenticatio
 | `list_updates` | What changed since a timestamp (deadline/value changes, cancellations, new awards). |
 | `aggregate_tenders` | Flexible analytics: count / sum / avg / min / max / median of **awarded value**, grouped by buyer, supplier, CPV, stage, status, regime, region, or time. |
 | `top_suppliers`, `awarded_value_by_buyer`, `awards_over_time`, `cpv_breakdown` | Named shortcuts over the aggregate engine. |
-| `query_sql` | Read-only BigQuery SQL over the public dataset (byte-capped; PII-free). The power tool. |
+| `query_sql` | Read-only BigQuery SQL over the public dataset (byte-capped; verbatim source data — may include published contact details). The power tool. |
 | `get_schema` | Tables/columns for `query_sql`. |
 | `get_status` | Per-source freshness, coverage and health. |
 
@@ -90,16 +90,17 @@ incumbents.
 ## Architecture
 
 ```
-Source portals ──Python adapters──► GCS raw archive (PII) ──► BigQuery uk_tenders_raw (write, PII)
-                                                                  │ compile (ocds-merge) + redact
-   AI assistant ──MCP──► Cloud Run (TS API, read-only SA) ──► BigQuery uk_tenders_public (read, redacted)
+Source portals ──Python adapters──► GCS raw archive ──► BigQuery uk_tenders_raw (write: full event log)
+                                                                  │ compile (ocds-merge), verbatim
+   AI assistant ──MCP──► Cloud Run (TS API, read-only SA) ──► BigQuery uk_tenders_public (read-only, query-serving)
                                                                   ▲
                               Cloud Run Job (Python) ◄── nightly Cloud Scheduler
 ```
 
 - **Read path:** MCP client → Cloud Run (TypeScript) → BigQuery public dataset.
-- **Write path:** nightly Cloud Run Job (Python) replays each source → raw event log → compiled, redacted, analytics-ready tables.
-- **PII boundary:** personal data (contact names/emails/phones) is redacted before anything reaches the public, queryable dataset; the API service account can read *only* that dataset.
+- **Write path:** nightly Cloud Run Job (Python) replays each source → raw event log → compiled, analytics-ready tables.
+- **Faithful mirror:** the public dataset reproduces the source OCDS **verbatim** — the index is not the authority of record and does not alter or remove content; every record carries the official notice URL and OGL v3.0 attribution.
+- **Data isolation:** the full raw event log and GCS archive stay in an access-controlled write tier the API service account *cannot* read — a least-privilege read boundary, so a compromised public API can only ever touch the query-serving dataset.
 
 See [`docs/PRD.md`](docs/PRD.md), the [ADRs](docs/adr/), and the glossary in [`CONTEXT.md`](CONTEXT.md).
 

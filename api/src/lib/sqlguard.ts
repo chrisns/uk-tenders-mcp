@@ -16,7 +16,7 @@ export function validateReadOnlySql(input: string): SqlGuard {
     return { ok: false, code: "FORBIDDEN", message: "DDL/DML is not allowed." };
   }
   if (/uk_tenders_raw/i.test(sql)) {
-    return { ok: false, code: "FORBIDDEN", message: "The raw (PII) dataset is not queryable; use uk_tenders_public." };
+    return { ok: false, code: "FORBIDDEN", message: "The raw write dataset is not queryable; use uk_tenders_public." };
   }
   return { ok: true, sql };
 }

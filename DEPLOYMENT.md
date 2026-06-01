@@ -22,10 +22,10 @@ dedicated project once a billing slot is freed is a one-variable change.
 FTS / (CF / PCS / Sell2Wales / eTendersNI) ──Python adapters──► GCS raw archive (PII)
                                                                       │
                           uk_tenders_raw  (BigQuery, WRITE, PII) ◄────┘
-                             release_event_log → compiled_process (redacted)
+                             release_event_log → compiled_process (verbatim)
                                                 → process_change, process_group, source_status
-                                                       │ redact + replace
-                          uk_tenders_public (BigQuery, READ, no PII)
+                                                       │ compile + replace
+                          uk_tenders_public (BigQuery, READ: verbatim, least-privilege boundary)
                                                        ▲
               Cloud Run: uk-tenders-mcp (TS) ──read-only SA──┘ ──MCP /mcp──► AI assistants
               Cloud Run Job: uk-tenders-ingest (Python) ◄── nightly Cloud Scheduler
@@ -141,9 +141,31 @@ your local gcloud ADC. (A keyless k8s/WIF CronJob was prototyped but abandoned: 
 WAF fingerprints the OS/TCP stack and blocks Linux regardless of a correct CAPTCHA, so the
 refresh must run from macOS. If CPD ever provides a feed or whitelists a host, automate then.)
 
+## Rebuild the public dataset from the raw event log (no re-scrape)
+
+The raw event log retains the full release JSON (`raw_json`) for every release, so `uk_tenders_public`
+is **fully reprojectable from raw** — no upstream re-scrape. This is how a compile-policy change reaches
+already-loaded data, e.g. the verbatim / no-redaction switch in
+[ADR-0006](docs/adr/0006-serve-source-data-verbatim.md) (previously-redacted OCDS rows regain their
+`contactPoint` fields once reprojected).
+
+The proven pattern — see `scripts/cf_finalize.py` (the Contracts Finder template):
+
+1. stream `SELECT ocid, raw_json FROM release_event_log WHERE source='<src>' ORDER BY ocid`;
+2. compile each OCID's full release history (`compile.project_process` + `diff_process`) into
+   **non-partitioned staging tables** (avoids the partition-modification quota on bulk assembly);
+3. assemble the live `compiled_process` / `process_change` with one CTAS that UNIONs the rebuilt source
+   with the other sources' rows, then an atomic `RENAME` swap;
+4. re-run cross-source dedup: `python -m uk_tenders_ingest.match`.
+
+The same pattern applies to any source by swapping the `source=` filter and the adapter; CF has a
+parallel variant (`scripts/cf_parallel_finalize.py`) for its larger corpus. A full-corpus rebuild
+reprojects each source in turn. (A normal `--mode backfill` would also rebuild the public tables, but
+it re-fetches upstream — unnecessary here, since the raw event log already holds every release verbatim.)
+
 ## Infrastructure as code (Terraform)
 
-`terraform/` is the canonical, reproducible definition (datasets, IAM with the PII boundary,
+`terraform/` is the canonical, reproducible definition (datasets, IAM with the least-privilege read boundary,
 GCS, Cloud Run service + job, nightly Scheduler). Tables are created by the ingestion
 `--bootstrap` step (single source of truth = `sql/schema.sql`), not duplicated in HCL.
 

@@ -6,7 +6,7 @@ This is the sanctioned BULK channel (one GET per day, no per-request pagination)
 than walking the rate-limited OCDS search API. Each CSV row is one release with path-style
 columns (`releases/0/tender/title`, `releases/0/awards/0/suppliers/0/name`, …). We un-flatten
 each row back into a nested OCDS release and yield it, so the rest of the pipeline (compile,
-redact, dedup) is unchanged. Source key stays `contracts_finder` — same publisher, faster path.
+dedup) is unchanged. Source key stays `contracts_finder` — same publisher, faster path.
 """
 
 from __future__ import annotations

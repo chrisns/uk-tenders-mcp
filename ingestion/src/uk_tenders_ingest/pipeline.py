@@ -3,7 +3,7 @@
 Backfill and nightly differ only by window bounds. The same entrypoint:
   1. walks the source over [from, to] in windows, collecting releases;
   2. MERGEs them into the raw event log (idempotent on content_hash);
-  3. recompiles every affected OCID from its full history, projects the redacted
+  3. recompiles every affected OCID from its full history, projects the
      curated row + change diffs, and replaces them in the public dataset;
   4. refreshes source_status and closes the ingest_run ledger row.
 A dry run does steps 1+compile in-memory only (no BigQuery) for validation.
