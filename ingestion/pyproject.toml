@@ -7,7 +7,7 @@ dependencies = [
     "requests>=2.31,<3",
     "google-cloud-bigquery>=3.25,<4",
     "ocdsmerge>=0.6,<1",
-    "google-genai>=1.0,<2",  # Gemini (Vertex AI) — eTendersNI CAPTCHA solving
+    "google-genai>=2.7,<3",  # Gemini (Vertex AI) — eTendersNI CAPTCHA solving
     "curl_cffi>=0.7,<1",     # Chrome TLS/JA3 impersonation (security-sensitive native dep)
 ]
 
