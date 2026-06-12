@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validateReadOnlySql } from "../src/lib/sqlguard.js";
 import { fromException } from "../src/lib/errors.js";
-import { shapeProcess } from "../src/lib/format.js";
+import { shapeProcess, processCols, type ResultMode } from "../src/lib/format.js";
 
 describe("validateReadOnlySql", () => {
   it("accepts SELECT and WITH", () => {
@@ -62,5 +62,36 @@ describe("shapeProcess", () => {
   it("full parses compiled_json", () => {
     const f = shapeProcess(row, "full") as Record<string, unknown>;
     expect((f.compiled as Record<string, unknown>).ocid).toBe("ocds-h6vhtk-1");
+  });
+});
+
+describe("processCols", () => {
+  it("minimal never reads the wide columns", () => {
+    const cols = processCols("minimal");
+    for (const wide of ["compiled_json", "description", "awards", "parties"]) {
+      expect(cols).not.toContain(wide);
+    }
+  });
+  it("only full reads compiled_json", () => {
+    expect(processCols("standard")).not.toContain("compiled_json");
+    expect(processCols("full")).toContain("compiled_json");
+  });
+  it("selects every column shapeProcess emits, per mode", () => {
+    // A fully-populated row: every field the shaper can read.
+    const row = {
+      ocid: "x", source: "fts", title: "T", description: "D", buyer_name: "B",
+      status: "active", stage: "tender", regime: "pca2023", main_category: "services",
+      value_amount: "1", value_currency: "GBP", awarded_amount: "1", awarded_currency: "GBP",
+      cpv_codes: ["72"], cpv_division: "72", region: "UK", process_group_id: "pg",
+      published_date: "2026-01-01", tender_end_date: "2026-02-01", last_updated: "2026-01-02",
+      official_url: "https://x/1", awards: [], parties: [], compiled_json: "{}",
+    };
+    for (const mode of ["minimal", "standard", "full"] as ResultMode[]) {
+      const cols = processCols(mode);
+      for (const key of Object.keys(shapeProcess(row, mode))) {
+        // `compiled` is derived from the compiled_json column.
+        expect(cols).toContain(key === "compiled" ? "compiled_json" : key);
+      }
+    }
   });
 });

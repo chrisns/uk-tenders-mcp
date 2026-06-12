@@ -99,7 +99,12 @@ CREATE TABLE IF NOT EXISTS `uk_tenders_public.compiled_process`
 -- tables assembled with a single CTAS; date-partitioning here tripped BigQuery's
 -- partition-modification quota during bulk assembly (and the corpus is small enough that
 -- clustering alone prunes well). See scripts/cf_parallel_finalize.py.
-CLUSTER BY source, buyer_name, cpv_division;
+-- Cluster keys serve the two scan-heavy paths: source-filtered search/analytics (source)
+-- and point lookups by id (ocid) — the wide compiled_json read in get_tender must prune
+-- to blocks or it alone busts the byte cap. buyer/cpv filters arrive as %LIKE%/UNNEST
+-- predicates, which never block-prune, so they earn no cluster key. Existing deployments:
+-- run sql/migrations/0001_recluster_compiled_process.sql.
+CLUSTER BY source, ocid;
 
 -- Field-level change feed (PRD 9): "what changed".
 CREATE TABLE IF NOT EXISTS `uk_tenders_public.process_change`

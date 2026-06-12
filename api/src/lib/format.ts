@@ -5,6 +5,27 @@ import { tableRef } from "./config.js";
 
 export type ResultMode = "minimal" | "standard" | "full";
 
+// Column projection per result mode. Selecting only what the mode emits is what
+// keeps row reads inside the byte cap: compiled_json dwarfs every other column
+// combined, and only `full` reads it. Kept beside shapeProcess so the projection
+// and the shaper cannot drift apart (pinned by a unit test).
+const COLS_MINIMAL = [
+  "ocid", "source", "title", "buyer_name", "status", "stage",
+  "value_amount", "value_currency", "awarded_amount", "awarded_currency",
+  "published_date", "tender_end_date", "official_url",
+];
+const COLS_STANDARD = [
+  ...COLS_MINIMAL,
+  "description", "regime", "main_category", "cpv_codes", "cpv_division",
+  "region", "process_group_id", "last_updated", "awards", "parties",
+];
+const COLS_FULL = [...COLS_STANDARD, "compiled_json"];
+
+export function processCols(mode: ResultMode): string {
+  const cols = mode === "full" ? COLS_FULL : mode === "standard" ? COLS_STANDARD : COLS_MINIMAL;
+  return cols.join(", ");
+}
+
 function p(v: unknown): unknown {
   return plain(v);
 }
