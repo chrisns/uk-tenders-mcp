@@ -14,7 +14,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@google-cloud/bigquery": "^8.0.0",
+    "@google-cloud/bigquery": "^9.0.0",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "express": "^5.0.0",
     "express-rate-limit": "^8.0.0",
