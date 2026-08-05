@@ -1,6 +1,6 @@
 # UK Tenders MCP — ingestion image (Cloud Run Job). Build context: repo root.
 #   docker build -f ingestion/Dockerfile -t uk-tenders-ingest .
-FROM python:3.14-slim@sha256:b0c4ec81396588a94b99052caf2f786e6e92e03111991d3d40c68762ee48d2ab
+FROM python:3.14-slim@sha256:7bec7ddcddeff7975d6ba9b4be7dd6f6b2f55e7491539145e2978f7f97ce9144
 WORKDIR /app
 # Major-version-bounded pins (no unbounded floors). google-genai: Gemini (Vertex AI) reads the
 # eTendersNI CAPTCHA. curl_cffi: ships a patched libcurl for Chrome TLS impersonation — a
