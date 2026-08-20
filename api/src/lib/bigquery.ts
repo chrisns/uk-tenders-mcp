@@ -34,21 +34,31 @@ export async function runQuery<T = Record<string, unknown>>(
   return rows as T[];
 }
 
-// Estimate scanned bytes without running the query (used to pre-empt QUERY_TOO_LARGE).
-export async function dryRunBytes(
+// Like runQuery, but also reports bytes processed. The byte cap is enforced at
+// runtime via maximumBytesBilled rather than a dry-run pre-check: dry-run
+// estimates ignore cluster pruning, so a pre-check rejects point lookups the
+// runtime would bill at a fraction of the cap. Over-cap queries still fail
+// unbilled (BigQuery cancels before charging) and surface as QUERY_TOO_LARGE.
+export async function runQueryWithStats<T = Record<string, unknown>>(
   sql: string,
-  params?: Record<string, unknown>,
-): Promise<number> {
+  opts: QueryOpts = {},
+): Promise<{ rows: T[]; totalBytesProcessed: number }> {
   const [job] = await bq.createQueryJob({
     query: sql,
-    params,
+    params: opts.params,
+    types: opts.types,
     location: config.location,
-    dryRun: true,
-    maximumBytesBilled: config.maxBytesBilled,
+    maximumBytesBilled: opts.maxBytes ?? config.maxBytesBilled,
+    jobTimeoutMs: Number(config.jobTimeoutMs),
   });
-  const bytes = (job.metadata?.statistics as { totalBytesProcessed?: string } | undefined)
+  const [rows] = await job.getQueryResults({
+    maxResults: opts.maxResults ?? 1000,
+    autoPaginate: false,
+  });
+  const [meta] = await job.getMetadata();
+  const bytes = (meta?.statistics as { totalBytesProcessed?: string } | undefined)
     ?.totalBytesProcessed;
-  return bytes ? Number(bytes) : 0;
+  return { rows: rows as T[], totalBytesProcessed: bytes ? Number(bytes) : 0 };
 }
 
 // Coerce BigQuery wrapper types (BigQueryTimestamp/Date, Big numerics) to plain JSON.

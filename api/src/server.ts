@@ -4,18 +4,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { config, tableRef } from "./lib/config.js";
-import { runQuery, dryRunBytes, plain } from "./lib/bigquery.js";
+import { runQuery, runQueryWithStats, plain } from "./lib/bigquery.js";
 import { ok, toolError, guard, type ToolResult } from "./lib/errors.js";
-import { shapeProcess, freshness, withFreshness, type ResultMode } from "./lib/format.js";
+import { shapeProcess, processCols, freshness, withFreshness, type ResultMode } from "./lib/format.js";
 import { validateReadOnlySql } from "./lib/sqlguard.js";
 
 const RESULT_MODE = z.enum(["minimal", "standard", "full"]).default("minimal");
 const SOURCE = z.enum(["fts", "contracts_finder", "pcs", "sell2wales", "etendersni"]);
-
-const PROCESS_COLS = `ocid, source, process_group_id, title, description, buyer_name, buyer_id,
-  status, stage, regime, main_category, value_amount, value_currency, awarded_amount,
-  awarded_currency, cpv_codes, cpv_division, region, published_date, tender_end_date,
-  last_updated, official_url, awards, parties, compiled_json`;
 
 // ---- shared filter builder (parameterised; safe) ---------------------------
 interface Filters {
@@ -218,7 +213,7 @@ export function buildServer(): McpServer {
       }
       const { clause, params } = buildWhere(args);
       const limit = args.limit;
-      const sql = `SELECT ${PROCESS_COLS} FROM ${tableRef("compiled_process")} ${clause}
+      const sql = `SELECT ${processCols(args.resultMode as ResultMode)} FROM ${tableRef("compiled_process")} ${clause}
         ORDER BY published_date DESC NULLS LAST LIMIT ${limit + 1} OFFSET ${offset}`;
       const rows = await runQuery(sql, { params });
       const hasMore = rows.length > limit;
@@ -237,15 +232,35 @@ export function buildServer(): McpServer {
       inputSchema: { id: z.string().describe("OCID (ocds-...) or notice id (nnnnnn-yyyy)"), resultMode: RESULT_MODE },
     },
     guard(async (args) => {
-      const sql = `SELECT ${PROCESS_COLS} FROM ${tableRef("compiled_process")}
-        WHERE ocid = @id OR official_url LIKE CONCAT('%/', @id) LIMIT 1`;
-      const rows = await runQuery(sql, { params: { id: args.id } });
+      // Two-step fetch. The notice-id form matches on an official_url suffix, which can
+      // never block-prune — so resolve identity over three narrow columns first, then
+      // read the wide row with equality predicates on the cluster keys. buyer_name is
+      // included when present so the legacy (source, buyer_name, cpv_division) layout
+      // prunes too, not just the (source, ocid) layout in schema.sql.
+      const found = await runQuery<{ ocid: string; source: string; buyer_name: string | null }>(
+        `SELECT ocid, source, buyer_name FROM ${tableRef("compiled_process")}
+         WHERE ocid = @id OR official_url LIKE CONCAT('%/', @id) LIMIT 1`,
+        { params: { id: args.id } },
+      );
+      if (!found.length) return toolError("NOT_FOUND", `no tender for id '${args.id}'`, "Try the OCID (ocds-h6vhtk-...) or the notice id (nnnnnn-yyyy).");
+      const key = found[0];
+      const conds = ["source = @source", "ocid = @ocid"];
+      const params: Record<string, unknown> = { source: key.source, ocid: key.ocid };
+      if (key.buyer_name != null) {
+        conds.push("buyer_name = @buyer_name");
+        params.buyer_name = key.buyer_name;
+      }
+      const rows = await runQuery(
+        `SELECT ${processCols(args.resultMode as ResultMode)} FROM ${tableRef("compiled_process")}
+         WHERE ${conds.join(" AND ")} LIMIT 1`,
+        { params },
+      );
       if (!rows.length) return toolError("NOT_FOUND", `no tender for id '${args.id}'`, "Try the OCID (ocds-h6vhtk-...) or the notice id (nnnnnn-yyyy).");
       const process = shapeProcess(rows[0], args.resultMode as ResultMode);
       const changes = await runQuery(
         `SELECT change_class, field_path, old_value, new_value, changed_at, official_url
-         FROM ${tableRef("process_change")} WHERE ocid = @ocid ORDER BY changed_at`,
-        { params: { ocid: rows[0].ocid } },
+         FROM ${tableRef("process_change")} WHERE source = @source AND ocid = @ocid ORDER BY changed_at`,
+        { params: { source: key.source, ocid: key.ocid } },
       );
       return ok(withFreshness({ process, change_timeline: changes.map((c) => ({ ...c, changed_at: plain(c.changed_at) })) }, await freshness()));
     }),
@@ -329,14 +344,13 @@ export function buildServer(): McpServer {
     guard(async (args) => {
       const g = validateReadOnlySql(args.sql);
       if (!g.ok) return toolError(g.code, g.message);
-      const sql = g.sql;
-      const bytes = await dryRunBytes(sql);
-      if (bytes > Number(config.maxBytesBilled)) {
-        return toolError("QUERY_TOO_LARGE", `Query would scan ~${(bytes / 1024 / 1024).toFixed(0)} MB; cap is ${config.maxBytesHuman}.`, "Add filters or aggregate.");
-      }
-      const rows = await runQuery(sql);
+      // Enforced at runtime (maximumBytesBilled), not via a dry-run pre-check: dry-run
+      // estimates ignore cluster pruning, so a pre-check rejects cheap point lookups
+      // (e.g. WHERE source/ocid) that the runtime bills at a fraction of the cap.
+      // Over-cap queries are cancelled unbilled and map to QUERY_TOO_LARGE in guard().
+      const { rows, totalBytesProcessed } = await runQueryWithStats(g.sql);
       const coerced = rows.slice(0, 1000).map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, plain(v)])));
-      return ok({ estimated_bytes: bytes, row_count: rows.length, rows: coerced });
+      return ok({ bytes_processed: totalBytesProcessed, row_count: rows.length, rows: coerced });
     }),
   );
 
