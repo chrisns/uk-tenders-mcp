@@ -46,8 +46,7 @@ class ProactisAdapter(Adapter):
                 url, timeout_s=self.timeout_s, max_retries=self.max_retries,
                 session=self.session, verify=False,
             )
-            for release in pkg.get("releases", []) or []:
-                yield release
+            yield from pkg.get("releases", []) or []
             m += 1
             if m > 12:
                 m, y = 1, y + 1

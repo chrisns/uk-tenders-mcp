@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from html import unescape
 
 import requests
@@ -50,7 +50,7 @@ def _strip(s: str) -> str:
 
 
 def _dd(htmltext: str, lbl: str) -> str | None:
-    m = re.search(r'id="ctl00_MainBody_' + lbl + r'"[^>]*>(.*?)</dd>', htmltext, re.S)
+    m = re.search(r'id="ctl00_MainBody_' + lbl + r'"[^>]*>(.*?)</dd>', htmltext, re.DOTALL)
     return _strip(m.group(1)) if m else None
 
 
@@ -58,7 +58,7 @@ def _section(htmltext: str, heading: str) -> str | None:
     """Body section: <h3>heading</h3> ... up to the next <h3>/<h2>/</section>."""
     m = re.search(
         r"<h3>\s*" + re.escape(heading) + r"\s*</h3>(.*?)(?=<h[23]>|</section>)",
-        htmltext, re.S | re.I,
+        htmltext, re.DOTALL | re.IGNORECASE,
     )
     return m.group(1) if m else None
 
@@ -93,7 +93,7 @@ def _parse_date(s: str | None) -> str | None:
     if pm and hh < 12:
         hh += 12
     try:
-        return datetime(yr, mon, day, min(hh, 23), mm).strftime("%Y-%m-%dT%H:%M:%S")
+        return datetime(yr, mon, day, min(hh, 23), mm, tzinfo=UTC).strftime("%Y-%m-%dT%H:%M:%S")
     except ValueError:
         return None
 
@@ -114,7 +114,7 @@ def _parse_value(sec: str | None) -> tuple[float | None, str | None]:
 def _list_items(sec: str | None) -> list[str]:
     if not sec:
         return []
-    return [_strip(li) for li in re.findall(r"<li>(.*?)</li>", sec, re.S)]
+    return [_strip(li) for li in re.findall(r"<li>(.*?)</li>", sec, re.DOTALL)]
 
 
 # Notice-type code -> (stage, status hint). UK4=Contract (tender), UK3=PIN/planning,
@@ -208,7 +208,7 @@ class Sell2WalesScrapeAdapter:
         rows = []
         # Each result links to search_view.aspx?ID=XXX with the title as the link text.
         for m in re.finditer(
-            r'search_view\.aspx\?ID=([A-Za-z0-9]+)"[^>]*>(.*?)</a>', htmltext, re.S
+            r'search_view\.aspx\?ID=([A-Za-z0-9]+)"[^>]*>(.*?)</a>', htmltext, re.DOTALL
         ):
             wid, title = m.group(1), _strip(m.group(2))
             if title:
@@ -307,12 +307,12 @@ class Sell2WalesScrapeAdapter:
         awards: list[dict] = []
         # Award notices list suppliers under an "Award information"/"Awarded to" area with
         # supplier name + value. Heuristic: find supplier blocks with a value.
-        sec = re.search(r"<h2>\s*Award(?:ed| information| details)?[^<]*</h2>(.*)", htmltext, re.S | re.I)
+        sec = re.search(r"<h2>\s*Award(?:ed| information| details)?[^<]*</h2>(.*)", htmltext, re.DOTALL | re.IGNORECASE)
         if not sec:
             return awards
         block = sec.group(1)
         for sm in re.finditer(
-            r"<h3>(.*?)</h3>(.*?)(?=<h3>|<h2>|</section>|$)", block, re.S
+            r"<h3>(.*?)</h3>(.*?)(?=<h3>|<h2>|</section>|$)", block, re.DOTALL
         ):
             name = _strip(sm.group(1))
             body = sm.group(2)

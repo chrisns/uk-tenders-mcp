@@ -85,7 +85,7 @@ class Settings:
     max_retries: int
 
     @staticmethod
-    def from_env() -> "Settings":
+    def from_env() -> Settings:
         return Settings(
             project=os.environ.get("GCP_PROJECT", "uk-tenders-mcp"),
             raw_dataset=os.environ.get("BQ_RAW_DATASET", "uk_tenders_raw"),

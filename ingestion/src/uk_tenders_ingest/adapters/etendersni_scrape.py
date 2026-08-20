@@ -16,7 +16,7 @@ from __future__ import annotations
 import os
 import re
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from html import unescape
 
 import requests
@@ -130,7 +130,7 @@ class ETendersNIAdapter:
         # inference, ~4-5s in-cluster) so the captcha solves below stay within the short TTL.
         try:
             _genai_client().models.generate_content(model=CAPTCHA_MODEL, contents=["warmup"])
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 — best-effort warmup; the real solve below is retried regardless
             pass
         last = ""
         for attempt in range(1, self.captcha_retries + 1):
@@ -139,7 +139,7 @@ class ETendersNIAdapter:
             t0 = time.time()
             try:
                 cap = solve_captcha(img)
-            except Exception as e:  # surface Vertex/auth errors instead of swallowing them
+            except Exception as e:  # noqa: BLE001 — surface Vertex/auth errors instead of swallowing them
                 last = f"gemini-error {type(e).__name__}: {str(e)[:240]}"
                 print(f"[etendersni] captcha attempt {attempt}: {last}", flush=True)
                 time.sleep(2)
@@ -189,12 +189,12 @@ class ETendersNIAdapter:
     @staticmethod
     def _rows(htmltext: str) -> list[dict]:
         out = []
-        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", htmltext, re.S):
-            m = re.search(r"prepareViewCfTWS\.do\?resourceId=(\d+)\">(.*?)</a>", tr, re.S)
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", htmltext, re.DOTALL):
+            m = re.search(r"prepareViewCfTWS\.do\?resourceId=(\d+)\">(.*?)</a>", tr, re.DOTALL)
             if not m:
                 continue
             rid, title = m.group(1), _strip(m.group(2))
-            tds = [_strip(td) for td in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+            tds = [_strip(td) for td in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.DOTALL)]
             dates = [t for t in tds if re.search(r"[A-Z][a-z]{2}\s+[A-Z][a-z]{2}\s+\d", t)]
             status = next((t for t in tds if t in ("Open", "Closed", "Awarded", "Cancelled",
                                                    "Under Evaluation", "Suspended")), "")
@@ -210,7 +210,7 @@ class ETendersNIAdapter:
         s = self.session()
         r = s.get(DETAIL.format(rid=rid), timeout=self.timeout_s)
         out = {}
-        for k, v in re.findall(r"<dt[^>]*>(.*?)</dt>\s*<dd[^>]*>(.*?)</dd>", r.text, re.S):
+        for k, v in re.findall(r"<dt[^>]*>(.*?)</dt>\s*<dd[^>]*>(.*?)</dd>", r.text, re.DOTALL):
             key = _strip(k).rstrip(":")
             if key and key not in out:
                 out[key] = _strip(v)
@@ -233,7 +233,7 @@ def parse_date(s: str | None) -> str | None:
     hh = int(m.group(4)) if m.group(4) else 0
     mm = int(m.group(5)) if m.group(5) else 0
     try:
-        return datetime(y, mo, d, hh, mm).strftime("%Y-%m-%dT%H:%M:%S")
+        return datetime(y, mo, d, hh, mm, tzinfo=UTC).strftime("%Y-%m-%dT%H:%M:%S")
     except ValueError:
         return None
 

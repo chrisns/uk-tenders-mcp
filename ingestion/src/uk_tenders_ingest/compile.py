@@ -74,8 +74,8 @@ def compile_release(releases: list[dict[str, Any]]) -> dict[str, Any]:
             from ocdsmerge import Merger  # type: ignore
 
             return Merger().create_compiled_release(ordered)
-        except Exception:
-            pass  # fall back to offline merge
+        except Exception:  # noqa: BLE001, S110 — fall back to offline merge
+            pass
     return _simple_merge(ordered)
 
 

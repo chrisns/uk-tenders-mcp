@@ -35,8 +35,7 @@ class ContractsFinderAdapter(Adapter):
         )
         while url:
             pkg = get_json(url, timeout_s=self.timeout_s, max_retries=self.max_retries, session=self.session)
-            for release in pkg.get("releases", []) or []:
-                yield release
+            yield from pkg.get("releases", []) or []
             links = pkg.get("links")
             nxt = links.get("next") if isinstance(links, dict) else None
             url = nxt if isinstance(nxt, str) and nxt else None

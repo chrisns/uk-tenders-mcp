@@ -45,8 +45,7 @@ class FTSAdapter(Adapter):
                 max_retries=self.max_retries,
                 session=self.session,
             )
-            for release in pkg.get("releases", []) or []:
-                yield release
+            yield from pkg.get("releases", []) or []
             links = pkg.get("links")
             # Termination signal (FTS, verified): the `links` key disappears. Guard against
             # a present-but-falsy/non-string `next` (would otherwise loop or error).
