@@ -14,7 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from .config import ALL_SOURCES, SOURCE_FTS, SOURCES, Settings
 from .pipeline import run
@@ -22,7 +22,7 @@ from .scrape_ingest import SCRAPE_RUNNERS
 
 
 def _default_nightly_window(settings: Settings) -> tuple[str, str]:
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     frm = now - timedelta(minutes=settings.nightly_lookback_minutes) - timedelta(days=1)
     return frm.strftime("%Y-%m-%dT%H:%M:%S"), now.strftime("%Y-%m-%dT%H:%M:%S")
 
@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     for src in sources:
         if args.mode == "backfill":
             frm = args.frm or SOURCES[src].backfill_floor
-            to = args.to or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+            to = args.to or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
         else:
             d_from, d_to = _default_nightly_window(settings)
             frm = args.frm or d_from
@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 summary.pop("sample_compiled", None)
                 summaries.append(summary)
-        except Exception as exc:  # adapter isolation (ADR-0004): one source down ≠ all down
+        except Exception as exc:  # noqa: BLE001 — adapter isolation (ADR-0004): one source down ≠ all down
             print(f"[{src}] FAILED (isolated): {exc}")
             summaries.append({"source": src, "error": str(exc)})
 

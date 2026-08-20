@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from . import compile as comp
 from .adapters.contracts_finder import ContractsFinderAdapter
@@ -53,8 +53,8 @@ def make_adapter(source: str, settings: Settings):
 def _parse(dt: str) -> datetime:
     s = dt.strip()
     if len(s) == 10:  # date only
-        return datetime.strptime(s, "%Y-%m-%d")
-    return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S")
+        return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=UTC)
+    return datetime.strptime(s[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=UTC)
 
 
 def _fmt(dt: datetime) -> str:
@@ -131,7 +131,7 @@ def run(
 ) -> dict:
     adapter = adapter or make_adapter(source, settings)
     run_id = f"{source}-{uuid.uuid4().hex[:12]}"
-    load_date = datetime.utcnow().strftime("%Y-%m-%d")
+    load_date = datetime.now(UTC).strftime("%Y-%m-%d")
 
     # ----- dry run: collect (bounded) for validation only, no BigQuery -----
     if dry_run:
@@ -204,6 +204,6 @@ def run(
         progress(f"[{source}] DONE: releases={seen} loaded={loaded} processes={processes} changes={changes}")
         return {"run_id": run_id, "releases": seen, "loaded": loaded,
                 "processes": processes, "changes": changes}
-    except Exception as exc:  # noqa: BLE001 — record failure then re-raise
+    except Exception as exc:
         loader.finish_ingest_run(run_id, "failed", seen, loaded, str(exc)[:500])
         raise

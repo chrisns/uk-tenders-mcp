@@ -15,7 +15,7 @@ import calendar
 import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import UTC, datetime
 
 from .canonical import content_hash
 
@@ -75,13 +75,14 @@ def _sell2wales_api_healthy() -> bool:
                          headers={"Accept": "application/json", "User-Agent": "uk-tenders-mcp/0.1"})
         ct = r.headers.get("content-type", "").lower()
         return r.status_code == 200 and "json" in ct and "nvarchar" not in r.text[:500].lower()
-    except Exception:
+    except Exception:  # noqa: BLE001 — probe: any failure means "not healthy", fall back to scrape
         return False
 
 
 def run_sell2wales(settings, loader, window_from: str, window_to: str, mode: str = "nightly") -> dict:
-    from .adapters.sell2wales_scrape import UA, Sell2WalesScrapeAdapter
     import requests
+
+    from .adapters.sell2wales_scrape import UA, Sell2WalesScrapeAdapter
 
     # Self-heal: the upstream OCDS API is broken (no ETA). The moment it returns valid OCDS,
     # switch to the clean API path and backfill the FULL history (idempotent, per-ocid replace),
@@ -97,7 +98,7 @@ def run_sell2wales(settings, loader, window_from: str, window_to: str, mode: str
 
     ad = Sell2WalesScrapeAdapter()
     run_id = f"s2w-{mode}-{uuid.uuid4().hex[:8]}"
-    load_date = datetime.utcnow().strftime("%Y-%m-%d")
+    load_date = datetime.now(UTC).strftime("%Y-%m-%d")
     df, dt = datetime.fromisoformat(window_from[:19]), datetime.fromisoformat(window_to[:19])
     # iterate whole months spanning the window
     rows: list[dict] = []
@@ -127,7 +128,7 @@ def run_etendersni(settings, loader, window_from: str, window_to: str, mode: str
 
     ad = ETendersNIAdapter()
     run_id = f"ni-{mode}-{uuid.uuid4().hex[:8]}"
-    load_date = datetime.utcnow().strftime("%Y-%m-%d")
+    load_date = datetime.now(UTC).strftime("%Y-%m-%d")
     listings = ad.search_window(_iso_to_ddmmyyyy(window_from), _iso_to_ddmmyyyy(window_to))
 
     rows: list[dict] = []
