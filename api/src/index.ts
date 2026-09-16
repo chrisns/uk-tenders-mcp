@@ -33,6 +33,12 @@ app.get("/health", (_req, res) => {
 
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
+// No background notifications are sent. Reject the optional standalone SSE stream
+// before rate limiting so idle clients cannot keep Cloud Run requests billable.
+// Tool responses still use the Streamable HTTP POST transport.
+app.get("/mcp", (_req, res) => {
+  res.set("Allow", "POST, DELETE").status(405).end();
+});
 app.use("/mcp", mcpLimiter);
 
 app.post("/mcp", async (req, res) => {
@@ -69,7 +75,7 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
-// GET (SSE stream) and DELETE (session teardown) for the streamable transport.
+// DELETE tears down the in-memory MCP session.
 const sessionRequest = async (req: express.Request, res: express.Response) => {
   const sid = req.headers["mcp-session-id"] as string | undefined;
   const transport = sid ? transports[sid] : undefined;
@@ -79,7 +85,6 @@ const sessionRequest = async (req: express.Request, res: express.Response) => {
   }
   await transport.handleRequest(req, res);
 };
-app.get("/mcp", sessionRequest);
 app.delete("/mcp", sessionRequest);
 
 app.listen(config.port, () => {
