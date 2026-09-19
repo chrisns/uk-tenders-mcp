@@ -1,5 +1,5 @@
 # UK Tenders MCP — API image (build context: api/)
-FROM node:24-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553 AS build
+FROM node:24-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -7,7 +7,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:24-slim@sha256:2fe369e969550cde8e867afc3fe370b260140cab4a23d467074295b42163d553
+FROM node:24-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
